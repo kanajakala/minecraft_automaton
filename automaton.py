@@ -7,12 +7,11 @@ import mcschematic
 import time
 import os
 
-mc_gradient0 = ['air','pink_concrete','pink_wool','cherry_leaves','birch_wood','chiseled_quartz_block','quartz_bricks','quartz_block','white_wool','powder_snow','snow_block']
-mc_gradient1 = ['air','dark_oak_log','dark_oak_planks','black_terracotta','deepslate_tiles','cobbled_deepslate','deepslate_bricks','waxed_copper_block','iron_block','stripped_oak_wood']
+PALETTE1 = ['air','pink_concrete','pink_wool','cherry_leaves','birch_wood','chiseled_quartz_block','quartz_bricks','quartz_block','white_wool','powder_snow','snow_block']
+PALETTE2 = ['air','dark_oak_log','dark_oak_planks','black_terracotta','deepslate_tiles','cobbled_deepslate','deepslate_bricks','waxed_copper_block','iron_block','stripped_oak_wood']
 
-path = "/home/sirvp/Downloads/dev_server/plugins/FastAsyncWorldEdit/schematics"
-
-#1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26
+WORLD_NAME = 'auto'
+PATH = "/home/sirvp/Downloads/dev_server/plugins/FastAsyncWorldEdit/schematics"
 
 rules = {
     'clouds': '13,14,15,16,17,18,19,20,21,22,23,24,25,26/13,14,17,18,19/2/M',
@@ -27,7 +26,7 @@ rules = {
 
 class Automaton:
 
-    def __init__(self,rule_string,gen_type,gen_size,weight,x,y,z,size_x,size_y,size_z,palette,path):
+    def __init__(self,rule_string,gen_type,gen_size,weight,x,y,z,size_x,size_y,size_z,palette,path,world_name):
         self.survive = [int(i) for i in rule_string.split('/')[0].split(',')]
         self.born = [int(i) for i in rule_string.split('/')[1].split(',')]
         self.fade = int(rule_string.split('/')[2])
@@ -45,6 +44,7 @@ class Automaton:
         self.size_y = size_y
         self.size_z = size_z
         self.path = path
+        self.world_name = world_name
         self.step = self.start(gen_type,gen_size,weight,self.fade,self.size_x,self.size_y,self.size_z)
 
     #numba optimizations
@@ -130,10 +130,10 @@ class Automaton:
         for zp in range(1,self.size_z-1):
             for yp in range(1,self.size_y-1):
                 for xp in range(1,self.size_x-1):
-                    self.schem.setBlock((xp,yp,zp),self.palette[self.step[zp,yp,xp]])
+                    self.schem.setBlock((xp,yp,zp),self.palette[self.step[zp,yp,xp]%self.fade])
         self.schem.save(self.path,name,mcschematic.Version.JE_1_20_1)
         with MCRcon("127.0.0.1", 'test') as mcr:
-            resp = mcr.command(' '.join(['su load',name,'auto',str(self.x),str(self.y),str(self.z)]))
+            resp = mcr.command(' '.join(['su load',name,self.world_name,str(self.x),str(self.y),str(self.z)]))
 
     def update(self):
         timestamp = str(time.time())
@@ -143,11 +143,11 @@ class Automaton:
 
 test = Automaton(rules['cube1'],'P',4,1,
                  0,100,0,80,80,80,
-                 mc_gradient1,path)
+                 PALETTE2,PATH,WORLD_NAME)
 
 while 1:
-    start_time = time.perf_counter()
+    #start_time = time.perf_counter()
     test.update()
-    end_time = time.perf_counter()
-    print('generation time:',(end_time-start_time)*1000)
+    #end_time = time.perf_counter()
+    #print('generation time:',(end_time-start_time)*1000)
 

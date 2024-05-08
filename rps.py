@@ -8,14 +8,14 @@ import mcschematic
 import time
 import os
 
-mc_gradient0 = ['air','white_stained_glass','pink_wool']
-mc_gradient1 = ['air','dark_oak_log','dark_oak_planks']
+PALETTE1 = ['air','white_stained_glass','pink_wool']
+PALETTE2 = ['air','dark_oak_log','dark_oak_planks']
 
-
-path = "/home/sirvp/Downloads/dev_server/plugins/FastAsyncWorldEdit/schematics"
+WORLD_NAME = 'auto'
+PATH = "/home/sirvp/Downloads/dev_server/plugins/FastAsyncWorldEdit/schematics"
 
 class Automaton:
-    def __init__(self,x,y,z,size_x,size_y,size_z,palette,path):
+    def __init__(self,x,y,z,size_x,size_y,size_z,palette,path,world_name):
         self.palette = palette
         self.x = x
         self.y = y
@@ -24,6 +24,7 @@ class Automaton:
         self.size_y = size_y
         self.size_z = size_z
         self.path = path
+        self.world_name = world_name
         self.step = np.random.randint(0, 3, size=(self.size_z,self.size_y,self.size_x), dtype=np.uint8)
 
     schem = mcschematic.MCSchematic()
@@ -72,7 +73,7 @@ class Automaton:
                     self.schem.setBlock((xp,yp,zp),self.palette[self.step[zp,yp,xp]])
         self.schem.save(self.path,name,mcschematic.Version.JE_1_20_1)
         with MCRcon("127.0.0.1", 'test') as mcr:
-            resp = mcr.command(' '.join(['su load',name,'auto',str(self.x),str(self.y),str(self.z)]))
+            resp = mcr.command(' '.join(['su load',name,self.world_name,str(self.x),str(self.y),str(self.z)]))
 
     def update(self):
         timestamp = str(time.time())
@@ -81,18 +82,11 @@ class Automaton:
         os.remove(self.path + '/' + timestamp + '.schem')
 
 
-test = Automaton(0,100,0,50,50,4,mc_gradient0,path) 
-test1 = Automaton(52,100,0,50,50,4,mc_gradient1,path) 
+test = Automaton(0,100,0,50,50,4,PALETTE1,PATH,WORLD_NAME) 
 
 while 1:
-    start_time = time.perf_counter()
-    test.update()
-    test1.update()
-    end_time = time.perf_counter()
-    print('generation time:',(end_time-start_time)*1000)
     #start_time = time.perf_counter()
-    #step = iter(step)
+    test.update()
     #end_time = time.perf_counter()
-    #print('step generation time:',(end_time-start_time)*1000)
-    #time.sleep(4/10)
+    #print('generation time:',(end_time-start_time)*1000)
 
