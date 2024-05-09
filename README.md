@@ -2,6 +2,8 @@
 
 The aim of this project is to visualize 3D cellular automatons in minecraft
 
+![cool images of cellular automatons, in minecraft](images/combined.png)
+
 ## Dependencies:
 To use this project you will need the following python libraries  installed:
 	

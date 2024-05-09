@@ -7,6 +7,7 @@ import mcschematic
 import time
 import os
 
+
 PALETTE1 = ['air','white_stained_glass','pink_wool','cherry_leaves','birch_wood','chiseled_quartz_block','quartz_bricks','quartz_block','white_wool','powder_snow','snow_block']
 PALETTE2 = ['air','dark_oak_log','dark_oak_planks','black_terracotta','deepslate_tiles','cobbled_deepslate','deepslate_bricks','waxed_copper_block','iron_block','stripped_oak_wood']
 PALETTE3 = ['air','granite','rooted_dirt','mud_bricks','packed_mud','spruce_planks','stripped_jungle_wood','stripped_oak_wood','oak_planks','waxed_exposed_copper_block','terracotta']
@@ -182,6 +183,7 @@ class Rps(Automaton):
         self.step = self.iterate(self.step,
                                  self.size_x,self.size_y,self.size_z)
         os.remove(PATH + '/' + timestamp + '.schem')
+
 
 
 test = Regular(rules['clouds1'],'R',1,1,
