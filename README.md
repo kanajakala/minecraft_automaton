@@ -1,5 +1,4 @@
-# 3D AUTOMATONS
-# visualized in minecraft
+# 3D Automatons visualized in minecraft
 
 The aim of this project is to visualize 3D cellular automatons in minecraft
 
@@ -23,4 +22,5 @@ You will also need a spigot, bukkit, paper, purpur or folia server to wich the s
 You need to download the repository or clone it, but you will need to make a few modifications to the code for it to run properly:
 * Unless you create a world in your server named ``'auto'`` you will need to change the code to change the world name to ``'world'`` (at the start of the code) for this to work
 * The PATH variable at the start of the code describes the path in wich the schematics will be put, this needs to be ``"[path to your server]/plugins/FastAsyncWorldEdit/schematics"``, don't forget to replace the ``/`` with ``\`` if you are on windows
-* you can then cd into the directory where you put the python code and execute the code using ``python automaton.py``  or ``python rps.py`` if you want the Rock Paper Scissors version
+* In the ``server.properties`` file of your minecraft server, you will need to enable RCON to allow the program to connect to your server, to do that simply change the line ``enable-rcon=false`` in ``server.properties`` to  ``enable-rcon=true``. You will also need to choose a password (``rcon.password=[your password]``), then in the python code you will need to change the line ``RCON_PASSWORD = 'test'`` to be the password you put in the ``server.properties``
+* you can then cd into the directory where you put the python code and execute the code using ``python automaton.py``, by default it will create a cloud cellular automaton at coordinates 0,100,0 and a rock paper scissors automaton besides it.
