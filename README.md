@@ -1,6 +1,7 @@
 # 3D Automatons visualized in minecraft
 
 The aim of this project is to visualize 3D cellular automatons in minecraft in real-time
+
 the inpiration for this project was [this blog](https://softologyblog.wordpress.com/2019/12/28/3d-cellular-automata-3/)
 
 ![cool images of cellular automatons, in minecraft](images/combined.png)
