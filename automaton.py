@@ -11,11 +11,11 @@ import os
 PALETTE1 = ['air','white_stained_glass','pink_wool','cherry_leaves','birch_wood','chiseled_quartz_block','quartz_bricks','quartz_block','white_wool','powder_snow','snow_block']
 PALETTE2 = ['air','dark_oak_log','dark_oak_planks','black_terracotta','deepslate_tiles','cobbled_deepslate','deepslate_bricks','waxed_copper_block','iron_block','stripped_oak_wood']
 PALETTE3 = ['air','granite','rooted_dirt','mud_bricks','packed_mud','spruce_planks','stripped_jungle_wood','stripped_oak_wood','oak_planks','waxed_exposed_copper_block','terracotta']
-PALETTE4 = ['air','purple_glazed_terracotta','black_glazed_terracotta','red_nether_bricks','netherrack','stripped_mangrove_wood','warped_hyphae','blue_glazed_terracotta','warped_planks','gray_concrete','waxed_oxydised_copper']
+PALETTE4 = ['air','pearlescent_froglight','black_glazed_terracotta','white_concrete','iron_block','stripped_mangrove_wood','warped_hyphae','blue_glazed_terracotta','warped_planks','gray_concrete','waxed_oxydised_copper']
 
-WORLD_NAME = 'auto'
-PATH = "/home/sirvp/Downloads/dev_server/plugins/FastAsyncWorldEdit/schematics"
-RCON_PASSWORD = 'test'
+WORLD_NAME = 'world'
+PATH = "[path to your server]/plugins/FastAsyncWorldEdit/schematics"
+RCON_PASSWORD = '[your password]'
 
 rules = {
     'clouds': '13,14,15,16,17,18,19,20,21,22,23,24,25,26/13,14,17,18,19/2/M',
@@ -24,7 +24,7 @@ rules = {
     'cube1': '4,5/1,2/10/M',
     'architecture': '4,5,6/3/2/M',
     'construction': '0,1,2,4,6,7,8,9,10,11,13,14,15,16,17,21,22,23,24,25,26/9,10,16,23,24/2/M',
-    'builder1': '1,2,3/1,4,5/5/N',
+    'builder': '1,2,3/1,4,5/5/N',
     'coral': '5,6,7,8/6,7,9,12/4/M'
 }
 
@@ -42,10 +42,14 @@ def neighbours_lookup(array,neighbour_type,x,y,z):
                       array[z+1,y-1,x-1], array[z+1,y-1,x], array[z+1,y-1,x+1],
                       array[z+1,y,x-1], array[z+1,y,x], array[z+1,y,x+1],
                       array[z+1,y+1,x-1], array[z+1,y+1,x], array[z+1,y+1,x+1]]
+    elif neighbour_type == 'Simple':
+        return  [array[z,y,x],array[z-1,y,x],array[z+1,y,x],
+                array[z,y-1,x],array[z,y+1,x],
+                array[z,y,x-1],array[z,y,x+1]]
     else:
         return  [array[z-1,y,x],array[z+1,y,x],
-                      array[z,y-1,x],array[z,y+1,x],
-                      array[z,y,x-1],array[z,y,x+1],]
+                array[z,y-1,x],array[z,y+1,x],
+                array[z,y,x-1],array[z,y,x+1]]
 
 @jit(nopython=True)
 def count_alive(neighbours):
@@ -145,12 +149,13 @@ class Regular(Automaton):
                         new[z,y,x] = fade-1
         return new
     
-    def update(self):
+    def update(self,n):
         timestamp = '_regular' + str(time.time())
+        for i in range(n):
+            self.step = self.iterate(self.step,
+                                     self.size_x,self.size_y,self.size_z,
+                                     self.survive,self.born,self.fade,self.alive,self.neighbour_type)
         self.mc_gen(timestamp,self.fade)
-        self.step = self.iterate(self.step,
-                                 self.size_x,self.size_y,self.size_z,
-                                 self.survive,self.born,self.fade,self.alive,self.neighbour_type)
         os.remove(PATH + '/' + timestamp + '.schem')
     
 
@@ -177,25 +182,61 @@ class Rps(Automaton):
                         new[z,y,x] = 0
         return new
     
-    def update(self):
+    def update(self,n):
         timestamp = '_rps' + str(time.time())
+        for i in range(n):
+            self.step = self.iterate(self.step,
+                                     self.size_x,self.size_y,self.size_z)
         self.mc_gen(timestamp,3)
-        self.step = self.iterate(self.step,
-                                 self.size_x,self.size_y,self.size_z)
         os.remove(PATH + '/' + timestamp + '.schem')
 
+class Simple(Automaton):
 
+    def __init__(self,rule,x,y,z,size_x,size_y,size_z,palette):
+        super().__init__(x,y,z,size_x,size_y,size_z,palette)
+        self.rule_string = bin(rule)[2:len(bin(rule))][::-1]
+        for i in range(6-len(self.rule_string)):
+            self.rule_string += '0'
+        self.alive = [i for i in range(len(self.rule_string)) if self.rule_string[i] == '1']
+        self.step = np.random.randint(0, 2, size=(self.size_z,self.size_y,self.size_x), dtype=np.uint8)
 
-test = Regular(rules['clouds1'],'R',1,1,
-                 0,100,0,80,80,80,
-                 PALETTE1)
-test_rps = Rps(85,100,0,80,80,80,PALETTE1)
+    #numba optimizations
+    @staticmethod
+    @jit(nopython=True)
+    def iterate(array,alive,size_x,size_y,size_z):
+        new = np.copy(array)
+        for y in range(1, size_y-1):
+            for x in range(1, size_x-1): 
+                for z in range(1,size_z-1):
+                    neighbours = neighbours_lookup(array,'Simple',x,y,z)
+                    if count_alive(neighbours) in alive:
+                        new[z,y,x] = 1
+                    else:
+                        new[z,y,x] = 0
+                    
+        return new
 
+    def update(self,n):
+        timestamp = '_simple' + str(time.time())
+        for i in range(n):
+            self.step = self.iterate(self.step,self.alive,
+                                     self.size_x,self.size_y,self.size_z)
+        self.mc_gen(timestamp,2)
+        os.remove(PATH + '/' + timestamp + '.schem')
+
+regular = Regular(rules['builder'],'P',4,1,
+                 0,100,0,50,50,50,
+                 PALETTE4)
+
+rps = Rps(52,100,0,50,50,50,PALETTE1)
+
+simple = Simple(14,104,100,0,50,50,50,PALETTE1)
 
 while 1:
     #start_time = time.perf_counter()
-    test.update()
-    test_rps.update()
+    regular.update(1)
+    rps.update(1)
+    simple.update(1)
     #end_time = time.perf_counter()
     #print('generation time:',(end_time-start_time)*1000)
 
