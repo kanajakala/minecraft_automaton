@@ -1,5 +1,4 @@
 
-
 from random import randint
 from numba import njit, prange
 from mcrcon import MCRcon
@@ -119,7 +118,6 @@ class Automaton:
             self.schem.setBlock((x, y, z), block)
 
         self.schem.save(PATH, name, mcschematic.Version.JE_1_20_1)
-        #os.remove(f'{PATH}/{name}.schem')
 
 
 class Regular(Automaton):
@@ -204,8 +202,7 @@ def update_automaton(automaton, iterations):
 
     timestamp = f'_{automaton.__class__.__name__.lower()}_{time.time()}_{i}'
     automaton.mc_gen(timestamp, automaton.fade if hasattr(automaton, 'fade') else 2)
-    
-    #print(f"generated schematic: {timestamp}.schem")
+
     os.remove(f'{PATH}/{timestamp}.schem')
 
 
