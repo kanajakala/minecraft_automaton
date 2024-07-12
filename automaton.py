@@ -238,7 +238,7 @@ def main():
         while 1: 
             start_time = time.perf_counter()
             for a in automatons:
-                a.update(default_step)
+                a.update(1)
             end_time = time.perf_counter()
             print(f'\rGeneration time: {(end_time - start_time):.3f}s',flush=True,end='\r')
     elif sys.argv[1] == "generate":
