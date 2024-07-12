@@ -6,6 +6,7 @@ import numpy as np
 import mcschematic
 import time
 import os
+import sys
 
 
 PALETTE1 = ['air','white_stained_glass','pink_wool','cherry_leaves','birch_wood','chiseled_quartz_block','quartz_bricks','quartz_block','white_wool','powder_snow','snow_block']
@@ -13,9 +14,9 @@ PALETTE2 = ['air','dark_oak_log','dark_oak_planks','black_terracotta','deepslate
 PALETTE3 = ['air','granite','rooted_dirt','mud_bricks','packed_mud','spruce_planks','stripped_jungle_wood','stripped_oak_wood','oak_planks','waxed_exposed_copper_block','terracotta']
 PALETTE4 = ['air','pearlescent_froglight','black_glazed_terracotta','white_concrete','iron_block','stripped_mangrove_wood','warped_hyphae','blue_glazed_terracotta','warped_planks','gray_concrete','waxed_oxydised_copper']
 
-WORLD_NAME = 'world'
-PATH = "[path to your server]/plugins/FastAsyncWorldEdit/schematics"
-RCON_PASSWORD = '[your password]'
+WORLD_NAME = 'auto'
+PATH = "/home/sirvp/Downloads/dev_server/plugins/FastAsyncWorldEdit/schematics"
+RCON_PASSWORD = 'test'
 
 rules = {
     'clouds': '13,14,15,16,17,18,19,20,21,22,23,24,25,26/13,14,17,18,19/2/M',
@@ -27,6 +28,8 @@ rules = {
     'builder': '1,2,3/1,4,5/5/N',
     'coral': '5,6,7,8/6,7,9,12/4/M'
 }
+
+default_step = 20
 
 @jit(nopython=True)
 def neighbours_lookup(array,neighbour_type,x,y,z):
@@ -113,8 +116,8 @@ class Automaton:
                 for xp in range(1,self.size_x-1):
                     self.schem.setBlock((xp,yp,zp),self.palette[self.step[zp,yp,xp]%fade])
         self.schem.save(PATH,name,mcschematic.Version.JE_1_20_1)
-        with MCRcon("127.0.0.1", RCON_PASSWORD) as mcr:
-            resp = mcr.command(' '.join(['su load',name,WORLD_NAME,str(self.x),str(self.y),str(self.z)]))
+        #with MCRcon("127.0.0.1", RCON_PASSWORD) as mcr:
+        #resp = mcr.command(' '.join(['su load',name,WORLD_NAME,str(self.x),str(self.y),str(self.z)]))
 
 
 class Regular(Automaton):
@@ -224,19 +227,27 @@ class Simple(Automaton):
         self.mc_gen(timestamp,2)
         os.remove(PATH + '/' + timestamp + '.schem')
 
-regular = Regular(rules['builder'],'P',4,1,
-                 0,100,0,50,50,50,
-                 PALETTE4)
 
-rps = Rps(52,100,0,50,50,50,PALETTE1)
+def main():
 
-simple = Simple(14,104,100,0,50,50,50,PALETTE1)
+    automatons = [Regular(rules['builder'],'P',4,1,0,100,0,50,50,50,PALETTE4),
+                  Rps(52,100,0,50,50,500,PALETTE1),
+                  Simple(14,104,100,0,50,50,50,PALETTE1)]
 
-while 1:
-    #start_time = time.perf_counter()
-    regular.update(1)
-    rps.update(1)
-    simple.update(1)
-    #end_time = time.perf_counter()
-    #print('generation time:',(end_time-start_time)*1000)
+    if len(sys.argv) == 1 or sys.argv[1] == "continuous":
+        while 1: 
+            start_time = time.perf_counter()
+            for a in automatons:
+                a.update(default_step)
+            end_time = time.perf_counter()
+            print(f'\rGeneration time: {(end_time - start_time):.3f}s',flush=True,end='\r')
+    elif sys.argv[1] == "generate":
+        step_number = default_step if len(sys.argv) == 2 else int(sys.argv[2])
+        start_time = time.perf_counter()
+        for a in automatons:
+            a.update(step_number)
+        end_time = time.perf_counter()
+        print(f'Generation time: {(end_time - start_time):.3f}s')
 
+if __name__ == "__main__":
+    main()
