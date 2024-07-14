@@ -1,7 +1,6 @@
 from random import randint
-from numba import jit
+from numba import njit
 from mcrcon import MCRcon
-from tkinter import *
 import numpy as np
 import mcschematic
 import time
@@ -9,12 +8,12 @@ import os
 import sys
 
 
-PALETTE1 = ['air','white_stained_glass','pink_wool','cherry_leaves','birch_wood','chiseled_quartz_block','quartz_bricks','quartz_block','white_wool','powder_snow','snow_block']
-PALETTE2 = ['air','dark_oak_log','dark_oak_planks','black_terracotta','deepslate_tiles','cobbled_deepslate','deepslate_bricks','waxed_copper_block','iron_block','stripped_oak_wood']
-PALETTE3 = ['air','granite','rooted_dirt','mud_bricks','packed_mud','spruce_planks','stripped_jungle_wood','stripped_oak_wood','oak_planks','waxed_exposed_copper_block','terracotta']
-PALETTE4 = ['air','pearlescent_froglight','black_glazed_terracotta','white_concrete','iron_block','stripped_mangrove_wood','warped_hyphae','blue_glazed_terracotta','warped_planks','gray_concrete','waxed_oxydised_copper']
+PALETTE1 = np.array(['air','white_stained_glass','pink_wool','cherry_leaves','birch_wood','chiseled_quartz_block','quartz_bricks','quartz_block','white_wool','powder_snow','snow_block'])
+PALETTE2 = np.array(['air','dark_oak_log','dark_oak_planks','black_terracotta','deepslate_tiles','cobbled_deepslate','deepslate_bricks','waxed_copper_block','iron_block','stripped_oak_wood'])
+PALETTE3 = np.array(['air','granite','rooted_dirt','mud_bricks','packed_mud','spruce_planks','stripped_jungle_wood','stripped_oak_wood','oak_planks','waxed_exposed_copper_block','terracotta'])
+PALETTE4 = np.array(['air','pearlescent_froglight','black_glazed_terracotta','white_concrete','iron_block','stripped_mangrove_wood','warped_hyphae','blue_glazed_terracotta','warped_planks','gray_concrete','waxed_oxydised_copper'])
 
-WORLD_NAME = 'auto'
+WORLD_NAME = 'world'
 PATH = "/home/sirvp/Downloads/dev_server/plugins/FastAsyncWorldEdit/schematics"
 RCON_PASSWORD = 'test'
 
@@ -31,7 +30,7 @@ rules = {
 
 default_step = 20
 
-@jit(nopython=True)
+@njit(cache=True)
 def neighbours_lookup(array,neighbour_type,x,y,z):
     if neighbour_type == 'M':
         return [array[z-1,y-1,x-1], array[z-1,y-1,x], array[z-1,y-1,x+1],
@@ -54,7 +53,7 @@ def neighbours_lookup(array,neighbour_type,x,y,z):
                 array[z,y-1,x],array[z,y+1,x],
                 array[z,y,x-1],array[z,y,x+1]]
 
-@jit(nopython=True)
+@njit(cache=True)
 def count_alive(neighbours):
     n = 0
     for i in neighbours:
@@ -115,9 +114,10 @@ class Automaton:
             for yp in range(1,self.size_y-1):
                 for xp in range(1,self.size_x-1):
                     self.schem.setBlock((xp,yp,zp),self.palette[self.step[zp,yp,xp]%fade])
+        print("generating minecraft")
         self.schem.save(PATH,name,mcschematic.Version.JE_1_20_1)
-        #with MCRcon("127.0.0.1", RCON_PASSWORD) as mcr:
-        #resp = mcr.command(' '.join(['su load',name,WORLD_NAME,str(self.x),str(self.y),str(self.z)]))
+        with MCRcon("127.0.0.1", RCON_PASSWORD) as mcr:
+            resp = mcr.command(' '.join(['su load',name,WORLD_NAME,str(self.x),str(self.y),str(self.z)]))
 
 
 class Regular(Automaton):
@@ -136,7 +136,7 @@ class Regular(Automaton):
 
     #numba optimizations
     @staticmethod
-    @jit(nopython=True)
+    @njit(cache=True)
     def iterate(array,size_x,size_y,size_z,survive,born,fade,alive,neighbour_type):
         new = np.copy(array)
         for y in range(1, size_y-1):
@@ -170,7 +170,7 @@ class Rps(Automaton):
 
     #numba optimizations
     @staticmethod
-    @jit(nopython=True)
+    @njit(cache=True)
     def iterate(array,size_x,size_y,size_z):
         new = np.copy(array)
         for y in range(1, size_y-1):
@@ -205,7 +205,7 @@ class Simple(Automaton):
 
     #numba optimizations
     @staticmethod
-    @jit(nopython=True)
+    @njit(cache=True)
     def iterate(array,alive,size_x,size_y,size_z):
         new = np.copy(array)
         for y in range(1, size_y-1):
@@ -230,10 +230,11 @@ class Simple(Automaton):
 
 def main():
 
-    automatons = [Regular(rules['builder'],'P',4,1,0,100,0,50,50,50,PALETTE4),
-                  Rps(52,100,0,50,50,500,PALETTE1),
-                  Simple(14,104,100,0,50,50,50,PALETTE1)]
-
+    #automatons = [#Regular(rules['builder'],'P',4,1,0,100,0,50,50,50,PALETTE4),
+    #              Rps(52,100,0,200,200,200,PALETTE1)]
+                  #Simple(14,104,100,0,50,50,50,PALETTE1)]
+    automatons = [Rps(-100, 200, 0, 200, 200, 200, PALETTE1)
+                  ]
     if len(sys.argv) == 1 or sys.argv[1] == "continuous":
         while 1: 
             start_time = time.perf_counter()
