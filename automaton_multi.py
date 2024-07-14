@@ -136,6 +136,7 @@ class Automaton:
         
         for i, schematic in enumerate(schematics):
             schematic_name = f"schematic_chunk_{i}"
+            print(f"generated minecraft schematic {schematic_name}")
             schematic.save(PATH, schematic_name, mcschematic.Version.JE_1_20_1)
             
             # Calculate the z-offset for this chunk
@@ -143,12 +144,26 @@ class Automaton:
             
             # Load the schematic into Minecraft
             try:
-                
+                #with MCRcon("127.0.0.1", RCON_PASSWORD) as mcr:
+                #    command = f'su load {schematic_name} {WORLD_NAME} {self.x} {self.y} {self.z + z_offset}'
+                #    resp = mcr.command(command)
+                #    print(resp)
+                #    print(f"Loaded chunk {i} at coordinates ({self.x}, {self.y}, {self.z + z_offset}): {resp}")
                 with Client('127.0.0.1', 25575, passwd='test') as client:
                     response = client.run(f'su load {schematic_name} {WORLD_NAME} {self.x} {self.y} {self.z + z_offset}')
                     print('\rserver response:'+response,end='\r',flush=True)
             except Exception as exc:
                 print(f"error with Mcrcon: {exc}")
+
+    def split_into_chunks(self, num_chunks: int) -> list[tuple[np.ndarray, tuple[int, int, int]]]:
+        chunk_size = self.size_z // num_chunks
+        chunks = []
+        for i in range(num_chunks):
+            start = i * chunk_size
+            end = start + chunk_size if i < num_chunks - 1 else self.size_z
+            chunk = self.step[start:end, :, :]
+            chunks.append((chunk, (start, 0, 0)))
+        return chunks
 
 
 class Regular(Automaton):
@@ -190,6 +205,7 @@ class Rps(Automaton):
     @staticmethod
     @njit(parallel=True, cache=True)
     def iterate(array, size_x, size_y, size_z):
+        #print("iterated once")
         new = np.copy(array)
         for y in prange(1, size_y - 1):
             for x in prange(1, size_x - 1):
@@ -204,42 +220,84 @@ class Rps(Automaton):
         return new
 
 
-def update_automaton(automaton, iterations):
-    for i in range(iterations):
-        if isinstance(automaton, Regular):
-            automaton.step = Regular.iterate(automaton.step, automaton.size_x, automaton.size_y, automaton.size_z, 
-                                             automaton.survive, automaton.born, automaton.fade, automaton.alive, automaton.neighbour_type)
-        elif isinstance(automaton, Rps):
-            automaton.step = Rps.iterate(automaton.step, automaton.size_x, automaton.size_y, automaton.size_z)
-        elif isinstance(automaton, Simple):
-            automaton.step = Simple.iterate(automaton.step, automaton.alive, automaton.size_x, automaton.size_y, automaton.size_z)
+class Simple(Automaton):
+    def __init__(self, rule, x, y, z, size_x, size_y, size_z, palette):
+        super().__init__(x, y, z, size_x, size_y, size_z, palette)
+        self.rule_string = bin(rule)[2:].zfill(6)[::-1]
+        self.alive = np.array([i for i in range(len(self.rule_string)) if self.rule_string[i] == '1'])
+        self.step = np.random.randint(0, 2, size=(self.size_z, self.size_y, self.size_x))
 
-    #timestamp = f'_{automaton.__class__.__name__.lower()}_{time.time()}_{i}'
+    @staticmethod
+    @njit(parallel=True, cache=True)
+    def iterate(array, alive, size_x, size_y, size_z):
+        new = np.copy(array)
+        for y in prange(1, size_y - 1):
+            for x in prange(1, size_x - 1):
+                for z in prange(1, size_z - 1):
+                    neighbours = neighbours_lookup(array, 'Simple', x, y, z)
+                    new[z, y, x] = 1 if count_alive(neighbours) in alive else 0
+        return new
+
+
+def process_chunk(chunk, offset, automaton):
+    if isinstance(automaton, Regular):
+        return Regular.iterate(chunk, automaton.size_x, automaton.size_y, chunk.shape[0], 
+                               automaton.survive, automaton.born, automaton.fade, automaton.alive, automaton.neighbour_type)
+    elif isinstance(automaton, Rps):
+        return Rps.iterate(chunk, automaton.size_x, automaton.size_y, chunk.shape[0])
+    elif isinstance(automaton, Simple):
+        return Simple.iterate(chunk, automaton.alive, automaton.size_x, automaton.size_y, chunk.shape[0])
+
+def update_automaton(automaton, iterations, use_chunks=False, num_chunks=4):
+    for _ in range(iterations):
+        if use_chunks:
+            chunks = automaton.split_into_chunks(num_chunks)
+            with concurrent.futures.ThreadPoolExecutor(max_workers=num_chunks) as executor:
+                processed_chunks = list(executor.map(lambda x: process_chunk(x[0], x[1], automaton), chunks))
+            automaton.step = np.concatenate(processed_chunks, axis=0)
+        else:
+            if isinstance(automaton, Regular):
+                automaton.step = Regular.iterate(automaton.step, automaton.size_x, automaton.size_y, automaton.size_z, 
+                                                 automaton.survive, automaton.born, automaton.fade, automaton.alive, automaton.neighbour_type)
+            elif isinstance(automaton, Rps):
+                automaton.step = Rps.iterate(automaton.step, automaton.size_x, automaton.size_y, automaton.size_z)
+            elif isinstance(automaton, Simple):
+                automaton.step = Simple.iterate(automaton.step, automaton.alive, automaton.size_x, automaton.size_y, automaton.size_z)
+        
+        print(f"Iteration completed for {type(automaton).__name__}")
+
+    print(f"Generating Minecraft schematic for {type(automaton).__name__}")
     automaton.mc_gen(automaton.step)
+    return automaton
 
-def update_automaton_wrapper(automaton, iterations):
-    return update_automaton(automaton, iterations)
+def process_automaton(automaton, iterations, use_chunks):
+    return update_automaton(automaton, iterations, use_chunks)
+
+def update_automaton_wrapper(automaton, iterations: int, use_chunks: bool = False, num_chunks: int = 10):
+    return update_automaton(automaton, iterations, use_chunks, num_chunks)
 
 def main():
-    #regular = Regular(rules['builder'], 'P', 4, 1, 0, 100, 0, 50, 50, 50, PALETTE4)
-    #rps = Rps(52, 100, 0, 200, 200, 200, PALETTE1)
-    #simple = Simple(14, 104, 100, 0, 50, 50, 50, PALETTE1)
-
-    automatons = [Rps(-100, 200, 0, 200, 200, 200, PALETTE1)
-                  ]
+    
+    automatons = [Rps(-100, 400, 0, 200, 200, 200, PALETTE1)]
 
     if len(sys.argv) == 1 or sys.argv[1] == "continuous":
+        use_chunks = len(sys.argv) > 2 and sys.argv[2] == "chunks"
         while True:
             start_time = time.perf_counter()
             with concurrent.futures.ProcessPoolExecutor() as executor:
-                list(executor.map(update_automaton_wrapper, automatons, [1]*len(automatons)))
+                futures = [executor.submit(process_automaton, a, 1, use_chunks) for a in automatons]
+                for future in concurrent.futures.as_completed(futures):
+                    future.result()  # This will raise any exceptions that occurred
             end_time = time.perf_counter()
             print(f'\rGeneration time: {(end_time - start_time):.3f}s', flush=True, end='')
     elif sys.argv[1] == "generate":
+        use_chunks = len(sys.argv) > 3 and sys.argv[3] == "chunks"
         start_time = time.perf_counter()
-        step_number = 100 if len(sys.argv) == 2 else int(sys.argv[2])
+        step_number = 100 if len(sys.argv) <= 2 else int(sys.argv[2])
         with concurrent.futures.ProcessPoolExecutor() as executor:
-            list(executor.map(update_automaton_wrapper, automatons, [step_number]*len(automatons)))
+            futures = [executor.submit(process_automaton, a, step_number, use_chunks) for a in automatons]
+            for future in concurrent.futures.as_completed(futures):
+                future.result()  # This will raise any exceptions that occurred
         end_time = time.perf_counter()
         print(f'Generation time: {(end_time - start_time):.3f}s')
 

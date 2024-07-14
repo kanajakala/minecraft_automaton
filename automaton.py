@@ -233,8 +233,9 @@ def main():
     #automatons = [#Regular(rules['builder'],'P',4,1,0,100,0,50,50,50,PALETTE4),
     #              Rps(52,100,0,200,200,200,PALETTE1)]
                   #Simple(14,104,100,0,50,50,50,PALETTE1)]
-    automatons = [Rps(-100, 200, 0, 200, 200, 200, PALETTE1)
-                  ]
+    
+    automatons = [Rps(-100, 200, 0, 200, 200, 200, PALETTE1)]
+
     if len(sys.argv) == 1 or sys.argv[1] == "continuous":
         while 1: 
             start_time = time.perf_counter()
